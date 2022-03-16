@@ -3,10 +3,14 @@ package build
 import (
 	"errors"
 	"fmt"
+	"log"
+	"net/http"
 	"os"
 	"runtime"
 	"runtime/debug"
 	"time"
+
+	"github.com/labstack/echo/v4"
 )
 
 type InfoStruct struct {
@@ -51,4 +55,15 @@ func GetBuildInfo() (*InfoStruct, error) {
 
 func bToMb(b uint64) uint64 {
 	return b / 1024 / 1024
+}
+
+func InfoEcho(c echo.Context) error {
+	info, err := GetBuildInfo()
+	if err != nil {
+		return err
+	}
+
+	log.Printf("Info from IP: %s", c.RealIP())
+
+	return c.JSONPretty(http.StatusOK, info, "  ")
 }
