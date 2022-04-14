@@ -1,4 +1,4 @@
-module tools
+module gitlab.com/nakami2/tools
 
 go 1.18
 
