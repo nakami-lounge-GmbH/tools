@@ -1,6 +1,7 @@
 package uploader
 
 import (
+	"encoding/binary"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -39,4 +40,19 @@ func GetUploadFile(f *multipart.FileHeader, typeChecker AllowedFileTypes, maxMBS
 	}
 
 	return buff, f.Filename, nil
+}
+
+func CheckFileTypeAndSize(data []byte, filename string, typeChecker AllowedFileTypes, maxMBSize int) error {
+	size := binary.Size(data)
+	if (size / 1024 / 1024) > maxMBSize {
+		return UploadErrMessage(fmt.Sprintf("Datei '%s' ist zu gross. Max %dMB erlaubt", filename, maxMBSize))
+	}
+
+	mtype := http.DetectContentType(data)
+
+	if !typeChecker.IsAllowed(mtype) {
+		return UploadErrMessage(fmt.Sprintf("Datei %s entspricht nicht dem geforderten Format: %s", filename, typeChecker.GetTypesString()))
+	}
+
+	return nil
 }
