@@ -3,6 +3,7 @@ package uploader
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/gabriel-vasile/mimetype"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -33,9 +34,10 @@ func GetUploadFile(f *multipart.FileHeader, typeChecker AllowedFileTypes, maxMBS
 		return nil, "", fmt.Errorf("reading buffer for file %s %w", f.Filename, err)
 	}
 
-	mtype := http.DetectContentType(buff)
+	//mtype := http.DetectContentType(buff)
+	mtype := mimetype.Detect(buff)
 
-	if !typeChecker.IsAllowed(mtype) {
+	if !typeChecker.IsAllowed(mtype.String()) {
 		return nil, "", UploadErrMessage(fmt.Sprintf("Datei %s entspricht nicht dem geforderten Format: %s", f.Filename, typeChecker.GetTypesString()))
 	}
 
