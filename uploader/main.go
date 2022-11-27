@@ -45,7 +45,7 @@ func GetUploadFile(f *multipart.FileHeader, typeChecker AllowedFileTypes, maxMBS
 
 func CheckFileTypeAndSize(data []byte, filename string, typeChecker AllowedFileTypes, maxMBSize int) error {
 	size := binary.Size(data)
-	if (size / 1024 / 1024) > maxMBSize {
+	if float64(size)/float64(1024)/float64(1024) > float64(maxMBSize) {
 		return UploadErrMessage(fmt.Sprintf("Datei '%s' ist zu gross. Max %dMB erlaubt", filename, maxMBSize))
 	}
 
