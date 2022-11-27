@@ -6,7 +6,6 @@ import (
 	"github.com/gabriel-vasile/mimetype"
 	"io"
 	"mime/multipart"
-	"net/http"
 )
 
 func GetUploadFile(f *multipart.FileHeader, typeChecker AllowedFileTypes, maxMBSize int64) ([]byte, string, error) {
@@ -50,9 +49,10 @@ func CheckFileTypeAndSize(data []byte, filename string, typeChecker AllowedFileT
 		return UploadErrMessage(fmt.Sprintf("Datei '%s' ist zu gross. Max %dMB erlaubt", filename, maxMBSize))
 	}
 
-	mtype := http.DetectContentType(data)
+	//mtype := http.DetectContentType(data)
+	mtype := mimetype.Detect(data)
 
-	if !typeChecker.IsAllowed(mtype) {
+	if !typeChecker.IsAllowed(mtype.String()) {
 		return UploadErrMessage(fmt.Sprintf("Datei %s entspricht nicht dem geforderten Format: %s", filename, typeChecker.GetTypesString()))
 	}
 
