@@ -12,24 +12,26 @@ type ExcelLineImporter[C any] struct {
 }
 
 type ExcelLineConfig struct {
-	SheetName       string //either name or number (0-indexed)
-	SheetNumber     int    //either name or number (0-indexed)
-	OffsetRow       int    //this should be the header row (not 0-indexed)
-	OffsetCol       int    //this should be the col (not 0-indexed) if there is an offset-x
-	FileBytes       []byte //data from the excel file
-	LineCountToRead int    //specifies, how many lines to read
+	SheetName         string   //either name or number (0-indexed)
+	SheetNumber       int      //either name or number (0-indexed)
+	OffsetRow         int      //this should be the header row (not 0-indexed)
+	OffsetCol         int      //this should be the col (not 0-indexed) if there is an offset-x
+	FileBytes         []byte   //data from the excel file
+	LineCountToRead   int      //specifies, how many lines to read
+	EmptyValueStrings []string //specifies values that should be treated as empty
 }
 
 func NewExcelLineImporter[C any](config *ExcelLineConfig, eL *ErrorList) (ExcelLineImporter[C], error) {
 	var r ExcelLineImporter[C]
 
 	r.Importer = newImorter[C](&Config{
-		dataType:        ExcelLine,
-		SheetName:       config.SheetName,
-		SheetNumber:     config.SheetNumber,
-		OffsetRow:       config.OffsetRow,
-		FileBytes:       config.FileBytes,
-		LineCountToRead: config.LineCountToRead,
+		dataType:          ExcelLine,
+		SheetName:         config.SheetName,
+		SheetNumber:       config.SheetNumber,
+		OffsetRow:         config.OffsetRow,
+		FileBytes:         config.FileBytes,
+		LineCountToRead:   config.LineCountToRead,
+		EmptyValueStrings: config.EmptyValueStrings,
 	}, eL)
 
 	var err error

@@ -6,6 +6,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/tealeg/xlsx"
 	"github.com/volatiletech/null/v8"
+	"golang.org/x/exp/slices"
 	"reflect"
 	"strconv"
 	"strings"
@@ -34,12 +35,13 @@ var (
 )
 
 type Config struct {
-	dataType        ImportType
-	SheetName       string //either name or number (0-indexed)
-	SheetNumber     int    //either name or number (0-indexed)
-	OffsetRow       int    //this should be the header row (not 0-indexed)
-	FileBytes       []byte //data from the excel file
-	LineCountToRead int    //specifies, how many lines to read
+	dataType          ImportType
+	SheetName         string   //either name or number (0-indexed)
+	SheetNumber       int      //either name or number (0-indexed)
+	OffsetRow         int      //this should be the header row (not 0-indexed)
+	FileBytes         []byte   //data from the excel file
+	LineCountToRead   int      //specifies, how many lines to read
+	EmptyValueStrings []string //specifies values that should be treated as empty
 }
 
 type Importer[C any] struct {
@@ -189,7 +191,7 @@ func (ii *Importer[C]) GetLineValues(line int, data []string) *reflect.Value {
 		f := v.FieldByName(value.Field.Name)
 		col := value.PosInData
 
-		if data[col] != "" {
+		if data[col] != "" && !slices.Contains(ii.Config.EmptyValueStrings, data[col]) {
 			fieldVal := f.Interface()
 			switch fieldVal.(type) {
 			case int, int32, int64:
@@ -372,7 +374,7 @@ func (ii *Importer[C]) fieldForName(fieldName string) *field {
 func (ii *Importer[C]) getCellValue(cell *xlsx.Cell, f reflect.Value, v *reflect.Value) error {
 	//v := reflect.New(ii.structType).Elem()
 	kk := f.Kind().String()
-	if cell.Value != "" {
+	if cell.Value != "" && !slices.Contains(ii.Config.EmptyValueStrings, cell.Value) {
 		fieldVal := f.Interface()
 		switch fieldVal.(type) {
 		case int, int32, int64:
@@ -381,6 +383,12 @@ func (ii *Importer[C]) getCellValue(cell *xlsx.Cell, f reflect.Value, v *reflect
 				return fmt.Errorf("getting reflect on field: %s int: %w", kk, err)
 			}
 			f.SetInt(int64(i))
+		case uint, uint32, uint64:
+			i, err := cell.Int()
+			if err != nil {
+				return fmt.Errorf("getting reflect on field: %s int: %w", kk, err)
+			}
+			f.SetUint(uint64(i))
 		case string:
 			f.SetString(cell.String())
 		case time.Time:

@@ -5,19 +5,21 @@ type ExcelPageImporter[C any] struct {
 }
 
 type ExcelPageConfig struct {
-	SheetName   string //either name or number (0-indexed)
-	SheetNumber int    //either name or number (0-indexed)
-	FileBytes   []byte //data from the excel file
+	SheetName         string   //either name or number (0-indexed)
+	SheetNumber       int      //either name or number (0-indexed)
+	FileBytes         []byte   //data from the excel file
+	EmptyValueStrings []string //specifies values that should be treated as empty
 }
 
 func NewExcelPageImporter[C any](config *ExcelPageConfig, eL *ErrorList) (ExcelPageImporter[C], error) {
 	var r ExcelPageImporter[C]
 
 	r.Importer = newImorter[C](&Config{
-		dataType:    ExcelPage,
-		SheetName:   config.SheetName,
-		SheetNumber: config.SheetNumber,
-		FileBytes:   config.FileBytes,
+		dataType:          ExcelPage,
+		SheetName:         config.SheetName,
+		SheetNumber:       config.SheetNumber,
+		FileBytes:         config.FileBytes,
+		EmptyValueStrings: config.EmptyValueStrings,
 	}, eL)
 
 	var err error
