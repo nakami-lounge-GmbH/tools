@@ -1,6 +1,6 @@
 module gitlab.com/nakami2/tools
 
-go 1.18
+go 1.21
 
 require (
 	golang.org/x/exp v0.0.0-20220407100705-7b9b53b0aca4
