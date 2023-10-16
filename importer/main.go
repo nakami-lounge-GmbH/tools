@@ -303,11 +303,13 @@ func (ii *Importer[C]) GetExcelLineValues(line int, row *xlsx.Row) *reflect.Valu
 	for excelRef, value := range ii.fields {
 		f := v.FieldByName(value.Field.Name)
 		col := value.PosInData
-		cell := row.Cells[col]
+		if col<len(row.Cells){
+			cell := row.Cells[col]
 
-		err = ii.getCellValue(cell, f, &v)
-		if err != nil {
-			ii.errorList.AddErrorString("error on getting field values for:%v error: %v", excelRef, err.Error())
+			err = ii.getCellValue(cell, f, &v)
+			if err != nil {
+				ii.errorList.AddErrorString("error on getting field values for:%v error: %v", excelRef, err.Error())
+			}
 		}
 	}
 
