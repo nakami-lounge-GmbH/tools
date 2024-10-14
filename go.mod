@@ -1,6 +1,6 @@
-module gitlab.com/nakami2/tools
+module github.com/nakami-lounge-GmbH/tools
 
-go 1.21
+go 1.23
 
 require (
 	github.com/gabriel-vasile/mimetype v1.4.3
