@@ -3,12 +3,14 @@ module github.com/nakami-lounge-GmbH/tools
 go 1.23
 
 require (
-	github.com/gabriel-vasile/mimetype v1.4.3
-	github.com/go-playground/validator/v10 v10.15.5
+	github.com/gabriel-vasile/mimetype v1.4.6
+	github.com/go-playground/validator/v10 v10.22.1
 	github.com/tealeg/xlsx v1.0.5
+	github.com/unidoc/unioffice v1.36.0
+	github.com/unidoc/unipdf/v3 v3.62.0
 	github.com/volatiletech/null/v8 v8.1.2
-	golang.org/x/exp v0.0.0-20231006140011-7918f672742d
-	golang.org/x/net v0.17.0
+	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c
+	golang.org/x/net v0.30.0
 )
 
 require (
@@ -16,12 +18,12 @@ require (
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/gofrs/uuid v4.4.0+incompatible // indirect
-	github.com/leodido/go-urn v1.2.4 // indirect
+	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/volatiletech/inflect v0.0.1 // indirect
 	github.com/volatiletech/randomize v0.0.1 // indirect
-	github.com/volatiletech/strmangle v0.0.5 // indirect
-	golang.org/x/crypto v0.14.0 // indirect
-	golang.org/x/sys v0.13.0 // indirect
-	golang.org/x/text v0.13.0 // indirect
-	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028 // indirect
+	github.com/volatiletech/strmangle v0.0.6 // indirect
+	golang.org/x/crypto v0.28.0 // indirect
+	golang.org/x/sys v0.26.0 // indirect
+	golang.org/x/text v0.19.0 // indirect
+	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 )
