@@ -10,21 +10,18 @@ import (
 	"time"
 )
 
-const (
-	unidocLicenseKey = `-----BEGIN UNIDOC LICENSE KEY-----
-eyJsaWNlbnNlX2lkIjoiYzcwM2QxNDUtYWMyYi00NTkxLTYwYzItNmY1ZTk4YmQ4Y2QyIiwiY3VzdG9tZXJfaWQiOiI5ZWEyZDUyMS01YmZkLTRmMjItNzI2YS04MzlmODcyMjcyMjYiLCJjdXN0b21lcl9uYW1lIjoibmFrYW1pIGxvdW5nZSBHbWJIIiwiY3VzdG9tZXJfZW1haWwiOiJtZkBuYWthbWkuZGUiLCJ0aWVyIjoiYnVzaW5lc3MiLCJjcmVhdGVkX2F0IjoxNjQ3ODgwNzAzLCJleHBpcmVzX2F0IjoxNjY3MDAxNTk5LCJjcmVhdG9yX25hbWUiOiJVbmlEb2MgU3VwcG9ydCIsImNyZWF0b3JfZW1haWwiOiJzdXBwb3J0QHVuaWRvYy5pbyIsInVuaXBkZiI6dHJ1ZSwidW5pb2ZmaWNlIjp0cnVlLCJ0cmlhbCI6ZmFsc2V9
-+
-OpHtrSR01n718vlRFQoAG+LkRxsNdz6Xmzqx3769D0mM3z5W3e7WGQyeWQySaGC4KAcwDcW2dTEpLjiFgZRwm9uKJ4Pz1Ro6TNqozwTjn9uGE6fOf4bI7z/15EHkri+oqteHelnyRJuuA5dwGMNbp9Q0aBu22J/WM0M7W6ktW12k3m3cXtoXbZ7LfTsw3x61Ep2ekG9w9lqmKwZ+8AcfD4IxukL5j70MswejWnalKHQcqpu+xgOeMtMdhYpsqwn9jokxFOeY+Owyh08BRudBD9MlQYETkOm0//xSBhuX+MdWxnYEOyV1JBAm+j/ZRKc2LBCvdXA5qa/Pe7PrarNrVA==
------END UNIDOC LICENSE KEY-----`
+var (
+	unidocLicenseKey   = os.Getenv("UNIDOC_LICENSE_KEY")
+	unidocCustomerName = os.Getenv("UNIDOC_CUSTOMER_NAME")
 )
 
 func initExcelLic() {
-	if err := license.SetLicenseKey(unidocLicenseKey, "Nakami Lounge GmbH"); err != nil {
+	if err := license.SetLicenseKey(unidocLicenseKey, unidocCustomerName); err != nil {
 		log.Println("Error loading unidocPDFLicense:", err)
 		os.Exit(-1)
 	}
 
-	if err := ll.SetLicenseKey(unidocLicenseKey, "nakami lounge GmbH"); err != nil {
+	if err := ll.SetLicenseKey(unidocLicenseKey, unidocCustomerName); err != nil {
 		log.Println("Error loading unidocOfficeLicense:", err)
 		os.Exit(-1)
 	}
@@ -47,23 +44,26 @@ func TestNewExcelLineImporter(t *testing.T) {
 	}
 
 	//var d []data
+	el := new(ErrorList)
 	i, err := NewExcelLineImporter[data](&ExcelLineConfig{
-		FileBytes:       fileBytes,
-		SheetName:       "Daten",
-		OffsetRow:       3,
-		OffsetCol:       2,
-		LineCountToRead: 1,
-	})
+		SheetName:         "Daten",
+		SheetNumber:       0,
+		OffsetRow:         3,
+		OffsetCol:         2,
+		FileBytes:         fileBytes,
+		LineCountToRead:   1,
+		EmptyValueStrings: nil,
+	}, el)
 
 	if err != nil {
-		if i.ErrorList.HasAny() {
-			log.Println("Errors:", i.ErrorList.String())
+		if el.HasAny() {
+			log.Println("Errors:", el.String())
 		}
 		log.Fatalln("With error:", err)
 	}
 
-	if i.ErrorList.HasAny() {
-		log.Fatalln(i.ErrorList.String())
+	if el.HasAny() {
+		log.Fatalln(el.String())
 	}
 
 	fmt.Println("data:", len(i.Data), i.Data)
@@ -86,20 +86,23 @@ func TestNewExcelPageImporter(t *testing.T) {
 	}
 
 	//var d []data
+	el := new(ErrorList)
 	i, err := NewExcelPageImporter[data](&ExcelPageConfig{
-		FileBytes: fileBytes,
-		SheetName: "Daten",
-	})
+		FileBytes:         fileBytes,
+		SheetName:         "Daten",
+		SheetNumber:       0,
+		EmptyValueStrings: []string{},
+	}, el)
 
 	if err != nil {
-		if i.ErrorList.HasAny() {
-			log.Println("Errors:", i.ErrorList.String())
+		if el.HasAny() {
+			log.Println("Errors:", el.String())
 		}
 		log.Fatalln("With error:", err)
 	}
 
-	if i.ErrorList.HasAny() {
-		log.Fatalln(i.ErrorList.String())
+	if el.HasAny() {
+		log.Fatalln(el.String())
 	}
 
 	fmt.Println("data:", len(i.Data), i.Data)
