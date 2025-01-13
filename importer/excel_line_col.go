@@ -45,12 +45,7 @@ func NewExcelLineColImporter[C any](config *ExcelLineColConfig, eL *ErrorList) (
 
 	for l, row := range sh.Rows {
 		if l == r.Importer.Config.OffsetRow-1 || (l == 0 && r.Importer.Config.OffsetRow == 0) {
-			line, headerCount = headerToStrings(row)
-			r.AddHeaders(line)
-			if eL.HasErrors() {
-				eL.AddErrorString("not reading data as headers are in error")
-				return r, nil
-			}
+			headerCount = len(row.Cells)
 		} else if l >= r.Config.OffsetRow {
 			if r.Config.LineCountToRead != 0 && linesProcessed >= r.Config.LineCountToRead {
 				break //exit for loop if number of lines reached

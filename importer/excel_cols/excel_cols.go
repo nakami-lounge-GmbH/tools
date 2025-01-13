@@ -1,5 +1,5 @@
 //go:generate stringer -type=ExcelPos
-package importer
+package excel_cols
 
 type ExcelPos int
 

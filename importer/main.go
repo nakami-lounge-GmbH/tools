@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/go-playground/validator/v10"
+	"github.com/nakami-lounge-GmbH/tools/importer/excel_cols"
 	"github.com/tealeg/xlsx"
 	"github.com/volatiletech/null/v8"
 	"golang.org/x/exp/slices"
@@ -127,16 +128,16 @@ func newImorter[C any](config *Config, eL *ErrorList) Importer[C] {
 	t := tt.Elem()
 	ii.structType = t
 
+	tagName := tagNameLine
+	if ii.Config.dataType == ExcelPage {
+		tagName = tagNamePage
+	} else if ii.Config.dataType == ExcelLineCol {
+		tagName = tagNameLineCol
+	}
+
 	// Iterate over all available fields and read the tag value
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
-
-		tagName := tagNameLine
-		if ii.Config.dataType == ExcelPage {
-			tagName = tagNamePage
-		} else if ii.Config.dataType == ExcelLineCol {
-			tagName = tagNameLineCol
-		}
 
 		tag := f.Tag.Get(tagName)
 		if tag != "" {
@@ -331,7 +332,7 @@ func (ii *Importer[C]) GetExcelLineColValues(line int, row *xlsx.Row) *reflect.V
 
 	for excelRef, value := range ii.fields {
 		f := v.FieldByName(value.Field.Name)
-		col := int(GetPosFromString(value.Col))
+		col := int(excel_cols.GetPosFromString(value.Col))
 
 		if col < len(row.Cells) {
 			cell := row.Cells[col]
