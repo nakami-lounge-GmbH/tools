@@ -5,10 +5,7 @@ type ExcelPageImporter[C any] struct {
 }
 
 type ExcelPageConfig struct {
-	SheetName         string   //either name or number (0-indexed)
-	SheetNumber       int      //either name or number (0-indexed)
-	FileBytes         []byte   //data from the excel file
-	EmptyValueStrings []string //specifies values that should be treated as empty
+	Config
 }
 
 func NewExcelPageImporter[C any](config *ExcelPageConfig, eL *ErrorList) (ExcelPageImporter[C], error) {

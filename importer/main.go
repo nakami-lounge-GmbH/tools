@@ -16,12 +16,14 @@ import (
 type ImportType int
 
 const (
-	ExcelLine ImportType = iota
-	ExcelPage ImportType = iota
+	ExcelLine    ImportType = iota
+	ExcelPage    ImportType = iota
+	ExcelLineCol ImportType = iota
 )
 
 const (
 	tagNameLine       = "header"
+	tagNameLineCol    = "col"
 	tagNamePage       = "excel_pos"
 	tagNameDateFormat = "format"
 )
@@ -93,6 +95,7 @@ func (ii *Importer[C]) GetSheet() (*xlsx.Sheet, error) {
 
 type field struct {
 	PosInData int    //used in line import. Specifies the position in the data
+	Col       string //used in line import. Specifies the position in the data
 	ExcelPos  string //used in page import. Holds the Excel position from the Tag
 	Field     reflect.StructField
 }
@@ -131,6 +134,8 @@ func newImorter[C any](config *Config, eL *ErrorList) Importer[C] {
 		tagName := tagNameLine
 		if ii.Config.dataType == ExcelPage {
 			tagName = tagNamePage
+		} else if ii.Config.dataType == ExcelLineCol {
+			tagName = tagNameLineCol
 		}
 
 		tag := f.Tag.Get(tagName)
@@ -139,6 +144,8 @@ func newImorter[C any](config *Config, eL *ErrorList) Importer[C] {
 				ii.fields[strings.ToLower(tag)] = &field{Field: f, PosInData: -1}
 			} else if ii.Config.dataType == ExcelPage {
 				ii.fields[strings.ToLower(tag)] = &field{Field: f, ExcelPos: tag}
+			} else if ii.Config.dataType == ExcelLineCol {
+				ii.fields[strings.ToLower(tag)] = &field{Field: f, Col: tag}
 			}
 		}
 	}
@@ -303,7 +310,30 @@ func (ii *Importer[C]) GetExcelLineValues(line int, row *xlsx.Row) *reflect.Valu
 	for excelRef, value := range ii.fields {
 		f := v.FieldByName(value.Field.Name)
 		col := value.PosInData
-		if col<len(row.Cells){
+		if col < len(row.Cells) {
+			cell := row.Cells[col]
+
+			err = ii.getCellValue(cell, f, &v)
+			if err != nil {
+				ii.errorList.AddErrorString("error on getting field values for:%v error: %v", excelRef, err.Error())
+			}
+		}
+	}
+
+	return &v
+}
+
+// GetExcelLineColValues returns an instance of the array element.
+// It must be cast to the concrete type by the caller
+func (ii *Importer[C]) GetExcelLineColValues(line int, row *xlsx.Row) *reflect.Value {
+	v := reflect.New(ii.structType).Elem()
+	var err error
+
+	for excelRef, value := range ii.fields {
+		f := v.FieldByName(value.Field.Name)
+		col := int(GetPosFromString(value.Col))
+
+		if col < len(row.Cells) {
 			cell := row.Cells[col]
 
 			err = ii.getCellValue(cell, f, &v)

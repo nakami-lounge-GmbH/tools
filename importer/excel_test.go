@@ -46,13 +46,14 @@ func TestNewExcelLineImporter(t *testing.T) {
 	//var d []data
 	el := new(ErrorList)
 	i, err := NewExcelLineImporter[data](&ExcelLineConfig{
-		SheetName:         "Daten",
-		SheetNumber:       0,
-		OffsetRow:         3,
-		OffsetCol:         2,
-		FileBytes:         fileBytes,
-		LineCountToRead:   1,
-		EmptyValueStrings: nil,
+		Config{
+			SheetName:         "Daten",
+			SheetNumber:       0,
+			OffsetRow:         3,
+			FileBytes:         fileBytes,
+			LineCountToRead:   1,
+			EmptyValueStrings: nil,
+		},
 	}, el)
 
 	if err != nil {
@@ -88,10 +89,55 @@ func TestNewExcelPageImporter(t *testing.T) {
 	//var d []data
 	el := new(ErrorList)
 	i, err := NewExcelPageImporter[data](&ExcelPageConfig{
-		FileBytes:         fileBytes,
-		SheetName:         "Daten",
-		SheetNumber:       0,
-		EmptyValueStrings: []string{},
+		Config{
+			FileBytes:         fileBytes,
+			SheetName:         "Daten",
+			SheetNumber:       0,
+			EmptyValueStrings: []string{},
+		},
+	}, el)
+
+	if err != nil {
+		if el.HasAny() {
+			log.Println("Errors:", el.String())
+		}
+		log.Fatalln("With error:", err)
+	}
+
+	if el.HasAny() {
+		log.Fatalln(el.String())
+	}
+
+	fmt.Println("data:", len(i.Data), i.Data)
+}
+
+func TestNewExcelLineColImporter(t *testing.T) {
+	initExcelLic()
+
+	type data struct {
+		Name       string    `col:"B"`
+		Vorname    string    `col:"C"`
+		Geburtstag time.Time `col:"E"`
+		CntKids    int       `col:"F"`
+		Test       float64   `col:"H"`
+	}
+
+	fileBytes, err := os.ReadFile("test1.xlsx")
+	if err != nil {
+		log.Fatalf("Error reading file: %v", err)
+	}
+
+	//var d []data
+	el := new(ErrorList)
+	i, err := NewExcelLineColImporter[data](&ExcelLineColConfig{
+		Config{
+			SheetName:         "Daten",
+			SheetNumber:       0,
+			OffsetRow:         3,
+			FileBytes:         fileBytes,
+			LineCountToRead:   5,
+			EmptyValueStrings: nil,
+		},
 	}, el)
 
 	if err != nil {

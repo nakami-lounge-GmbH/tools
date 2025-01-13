@@ -4,25 +4,26 @@ import (
 	"fmt"
 )
 
-type ExcelLineImporter[C any] struct {
+type ExcelLineColImporter[C any] struct {
 	Importer[C]
 
 	LinesProcessed int
 	LinesImported  int
 }
 
-type ExcelLineConfig struct {
+type ExcelLineColConfig struct {
 	Config
 }
 
-// NewExcelLineImporter returns a line importer
+// NewExcelLineColImporter returns a new line-importer, where the cols are specified via "col" tag
+// the importer still needs a header line but only for determining the number of cols
+// the data tag is col "A", "B", "AA" ...
 // Offset must be set to the line numbers before the header line or 0
-// header is specified by "header" tag
-func NewExcelLineImporter[C any](config *ExcelLineConfig, eL *ErrorList) (ExcelLineImporter[C], error) {
+func NewExcelLineColImporter[C any](config *ExcelLineColConfig, eL *ErrorList) (ExcelLineImporter[C], error) {
 	var r ExcelLineImporter[C]
 
 	r.Importer = newImorter[C](&Config{
-		dataType:          ExcelLine,
+		dataType:          ExcelLineCol,
 		SheetName:         config.SheetName,
 		SheetNumber:       config.SheetNumber,
 		OffsetRow:         config.OffsetRow,
@@ -43,7 +44,6 @@ func NewExcelLineImporter[C any](config *ExcelLineConfig, eL *ErrorList) (ExcelL
 	linesProcessed := 0
 
 	for l, row := range sh.Rows {
-
 		if l == r.Importer.Config.OffsetRow-1 || (l == 0 && r.Importer.Config.OffsetRow == 0) {
 			line, headerCount = headerToStrings(row)
 			r.AddHeaders(line)
@@ -60,7 +60,7 @@ func NewExcelLineImporter[C any](config *ExcelLineConfig, eL *ErrorList) (ExcelL
 
 			if !isEmpty(line) {
 				r.LinesProcessed++
-				mV := r.GetExcelLineValues(l, row)
+				mV := r.GetExcelLineColValues(l, row)
 				if eL.HasErrors() {
 					return r, nil
 				}
