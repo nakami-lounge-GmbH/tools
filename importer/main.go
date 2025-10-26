@@ -3,10 +3,10 @@ package importer
 import (
 	"errors"
 	"fmt"
+	"github.com/aarondl/null/v8"
 	"github.com/go-playground/validator/v10"
 	"github.com/nakami-lounge-GmbH/tools/importer/excel_cols"
 	"github.com/tealeg/xlsx"
-	"github.com/volatiletech/null/v8"
 	"golang.org/x/exp/slices"
 	"reflect"
 	"strconv"
