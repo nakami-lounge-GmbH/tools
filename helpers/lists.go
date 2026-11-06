@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-//ListToInterfaceList converts a list of data to interface list. We need this in some db function
+// ListToInterfaceList converts a list of data to interface list. We need this in some db function
 func ListToInterfaceList[T any](list []T) []interface{} {
 	retList := make([]interface{}, len(list))
 	for i, v := range list {
@@ -28,7 +28,7 @@ func StringInSliceI(s string, list []string) bool {
 	return pos != -1
 }
 
-//CompareSlices return true if both slices contain the same elements, indifferently of the order
+// CompareSlices return true if both slices contain the same elements, indifferently of the order
 func CompareSlices[T comparable](a, b []T) bool {
 	if len(a) != len(b) {
 		return false
@@ -42,7 +42,7 @@ func CompareSlices[T comparable](a, b []T) bool {
 	return true
 }
 
-//IntSliceToStringSlice converts an int slice to string slice
+// IntSliceToStringSlice converts an int slice to string slice
 func IntSliceToStringSlice[T constraints.Integer](a []T) []string {
 	var ret []string
 	for _, v := range a {

@@ -13,19 +13,18 @@ Signaturen brechen daher stillschweigend die Konsumenten-Repos — Signaturen m�
 ```bash
 go build ./...                              # muss sauber durchlaufen
 go vet ./...
-go test ./...                               # siehe Einschränkungen unten
-go test -vet=off ./...                      # umgeht den bekannten vet-Fehler in helpers/
+go test ./...                               # läuft sauber durch, inklusive vet
 go test ./importer/ -run TestNewExcelPageImporter -v   # einzelner Test
 go generate ./importer/excel_cols/          # stringer für ExcelPos neu erzeugen
 go install golang.org/x/tools/cmd/stringer@latest      # Voraussetzung für go generate
 go get -u ./...                             # Dependency-Upgrade (Repo-Historie besteht großteils daraus)
 ```
 
-Einschränkungen beim Testen (bestehender Zustand, nicht versehentlich eingeführt):
+Zum Testen:
 
-- `go test ./...` **scheitert** am Package `helpers` (`helpers/file.go:77`: non-constant format string in
-  `fmt.Printf`). Der vet-Lauf von `go test` bricht den Build ab, obwohl `helpers` keine Tests hat.
-  Entweder `-vet=off` verwenden oder die Zeile korrigieren.
+- `go build ./...`, `go vet ./...`, `gofmt -l .` und `go test ./...` laufen sauber durch. Der früher
+  nötige Umweg über `-vet=off` ist weg: der non-constant format string in `helpers/file.go` ist
+  korrigiert.
 - Die `importer`-Tests brauchen keine Lizenz und keine Env-Variablen mehr; die Lizenz-Dependencies
   unidoc/unioffice sind mit dem Wechsel auf excelize entfallen. Fixture: `importer/test1.xlsx`,
   Sheet „Daten“ (Header in Zeile 3, Daten in Zeile 4 und 5, Spalten B, C, E, F, H).

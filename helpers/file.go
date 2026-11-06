@@ -11,7 +11,7 @@ import (
 	"golang.org/x/net/html/charset"
 )
 
-//DetermineEncodingFromReader tries to get the encoding from a reader
+// DetermineEncodingFromReader tries to get the encoding from a reader
 func DetermineEncodingFromReader(file multipart.File, size int64) string {
 	var mLen int64 = 1024
 	if size < mLen {
@@ -69,19 +69,19 @@ func GetFileContentType(out *os.File) (string, error) {
 	return contentType, nil
 }
 
-//CreateDirIfNotExists creates an directory if it does not exists
+// CreateDirIfNotExists creates an directory if it does not exists
 func CreateDirIfNotExists(path string) error {
 	if !ExistDir(path) {
 		err := os.MkdirAll(path, os.ModePerm)
 		if err != nil {
-			fmt.Printf(fmt.Sprintf("Could not create dir <%s>\n", path))
+			fmt.Printf("Could not create dir <%s>\n", path)
 			return err
 		}
 	}
 	return nil
 }
 
-//ExistDir checks if an directory exists
+// ExistDir checks if an directory exists
 func ExistDir(path string) bool {
 	if stat, err := os.Stat(path); err == nil && stat.IsDir() {
 		return true
@@ -89,7 +89,7 @@ func ExistDir(path string) bool {
 	return false
 }
 
-//FileExists checks if file exists
+// FileExists checks if file exists
 func FileExists(path string) bool {
 	if stat, err := os.Stat(path); err == nil && !stat.IsDir() {
 		return true
