@@ -3,10 +3,8 @@ package importer
 import (
 	"errors"
 	"fmt"
-	"github.com/aarondl/null/v8"
 	"github.com/go-playground/validator/v10"
 	"github.com/nakami-lounge-GmbH/tools/importer/excel_cols"
-	"github.com/tealeg/xlsx"
 	"golang.org/x/exp/slices"
 	"reflect"
 	"strconv"
@@ -69,29 +67,14 @@ type Importer[C any] struct {
 	Data []C
 }
 
-func (ii *Importer[C]) GetSheet() (*xlsx.Sheet, error) {
-	xlsFile, err := xlsx.OpenBinary(ii.Config.FileBytes)
-	if err != nil {
-		return nil, err
+// GetSheet reads the sheet named in the config, or, if no name is set, the
+// sheet with the configured 1-based number. The caller must Close the sheet
+func (ii *Importer[C]) GetSheet() (*Sheet, error) {
+	if ii.Config.SheetName == "" && ii.Config.SheetNumber == 0 {
+		return nil, errors.New("no sheet selected: set either SheetName or SheetNumber")
 	}
 
-	var sh *xlsx.Sheet
-	var ok bool
-
-	if ii.Config.SheetName != "" {
-		sh, ok = xlsFile.Sheet[ii.Config.SheetName]
-		if !ok {
-			return nil, fmt.Errorf("error reading sheet %s", ii.Config.SheetName)
-		}
-	} else if ii.Config.SheetNumber != 0 {
-		if ii.Config.SheetNumber <= len(xlsFile.Sheets) {
-			sh = xlsFile.Sheets[ii.Config.SheetNumber-1]
-		} else {
-			return nil, fmt.Errorf("error reading sheet index %d", ii.Config.SheetNumber)
-		}
-	}
-
-	return sh, nil
+	return openSheet(ii.Config.FileBytes, ii.Config.SheetName, ii.Config.SheetNumber)
 }
 
 type field struct {
@@ -200,100 +183,8 @@ func (ii *Importer[C]) GetLineValues(line int, data []string) *reflect.Value {
 		col := value.PosInData
 
 		if data[col] != "" && !slices.Contains(ii.Config.EmptyValueStrings, data[col]) {
-			fieldVal := f.Interface()
-			switch fieldVal.(type) {
-			case int, int32, int64:
-				s := strings.Replace(data[col], ".", "", -1) //remove possible dots
-				s = strings.Trim(s, "%\n ")
-				if i, err := strconv.Atoi(s); err == nil {
-					f.SetInt(int64(i))
-				} else {
-					ii.errorList.AddValidation(line, col, header, err)
-					return nil
-				}
-
-			case string:
-				f.SetString(data[col])
-
-			case time.Time:
-				//check if format-tag set
-				format := value.Field.Tag.Get(tagNameDateFormat)
-				if format == "" {
-					ii.errorList.AddValidation(line, col, header, fmt.Errorf("No format tag on structfield '%s'", header))
-					return nil
-				}
-				t, err := time.Parse(format, data[col])
-				if err != nil {
-					ii.errorList.AddValidation(line, col, header, fmt.Errorf("Could not parse value '%s' as date-time with format '%s'", data[col], format))
-					return nil
-				}
-				f.Set(reflect.ValueOf(t))
-
-			case float32, float64:
-				s := data[col]
-				s = strings.Replace(s, ",", ".", 1) //we need to have only one format
-				if i, err := strconv.ParseFloat(s, 64); err == nil {
-					f.SetFloat(float64(i))
-				} else {
-					ii.errorList.AddValidation(line, col, header, err)
-					return nil
-				}
-
-			case bool:
-				s := strings.ToLower(data[col])
-				if s == "wahr" || s == "true" || s == "ja" || s == "yes" || s == "1" || s == "x" {
-					f.SetBool(true)
-				} else {
-					f.SetBool(false)
-				}
-			case null.String:
-				f.Set(reflect.ValueOf(null.StringFrom(data[col])))
-			case null.Time:
-				//check if format-tag set
-				format := value.Field.Tag.Get(tagNameDateFormat)
-				if format == "" {
-					ii.errorList.AddValidation(line, col, header, fmt.Errorf("No format tag on structfield '%s'", header))
-					return nil
-				}
-				t, err := time.Parse(format, data[col])
-				if err != nil {
-					ii.errorList.AddValidation(line, col, header, fmt.Errorf("Could not parse value '%s' as date-time with format '%s'", data[col], format))
-					return nil
-				}
-				f.Set(reflect.ValueOf(null.TimeFrom(t)))
-			case null.Int:
-
-				s := strings.Replace(data[col], ".", "", -1) //remove possible dots
-				s = strings.Trim(s, "%\n ")
-
-				if i, err := strconv.Atoi(s); err == nil {
-					f.Set(reflect.ValueOf(null.IntFrom(i)))
-				} else {
-					ii.errorList.AddValidation(line, col, header, err)
-					return nil
-				}
-			case null.Uint:
-
-				s := strings.Replace(data[col], ".", "", -1) //remove possible dots
-				s = strings.Trim(s, "%\n ")
-
-				if i, err := strconv.ParseUint(s, 10, 32); err == nil {
-					f.Set(reflect.ValueOf(null.UintFrom(uint(i))))
-				} else {
-					ii.errorList.AddValidation(line, col, header, err)
-					return nil
-				}
-
-			case null.Bool:
-				s := strings.ToLower(data[col])
-				if s == "wahr" || s == "true" || s == "ja" || s == "yes" || s == "1" || s == "x" {
-					f.Set(reflect.ValueOf(null.BoolFrom(true)))
-				} else {
-					f.Set(reflect.ValueOf(null.BoolFrom(false)))
-				}
-
-			default:
-				ii.errorList.AddValidation(line, col, header, fmt.Errorf("undefined kind '%v' on structfield '%s'", f.Kind(), header))
+			if err := ii.setLineValue(f, data[col], value, header); err != nil {
+				ii.errorList.AddValidation(line, col, header, err)
 				return nil
 			}
 		}
@@ -302,9 +193,87 @@ func (ii *Importer[C]) GetLineValues(line int, data []string) *reflect.Value {
 	return &v
 }
 
+// setLineValue converts one value of a data line into the struct field it
+// belongs to. Nullable fields are filled through their value field and are
+// marked as set afterwards, see nullableValue
+func (ii *Importer[C]) setLineValue(f reflect.Value, s string, value *field, header string) error {
+	switch f.Interface().(type) {
+	case int, int32, int64:
+		i, err := strconv.Atoi(cleanNumberString(s))
+		if err != nil {
+			return err
+		}
+		f.SetInt(int64(i))
+
+	case uint, uint32, uint64:
+		i, err := strconv.ParseUint(cleanNumberString(s), 10, f.Type().Bits())
+		if err != nil {
+			return err
+		}
+		f.SetUint(i)
+
+	case string:
+		f.SetString(s)
+
+	case time.Time:
+		//check if format-tag set
+		format := value.Field.Tag.Get(tagNameDateFormat)
+		if format == "" {
+			return fmt.Errorf("No format tag on structfield '%s'", header)
+		}
+
+		t, err := time.Parse(format, s)
+		if err != nil {
+			return fmt.Errorf("Could not parse value '%s' as date-time with format '%s'", s, format)
+		}
+		f.Set(reflect.ValueOf(t))
+
+	case float32, float64:
+		i, err := strconv.ParseFloat(strings.Replace(s, ",", ".", 1), 64) //we need to have only one format
+		if err != nil {
+			return err
+		}
+		f.SetFloat(i)
+
+	case bool:
+		f.SetBool(isTrueString(s))
+
+	default:
+		inner, ok := nullableValue(f)
+		if !ok {
+			return fmt.Errorf("undefined kind '%v' on structfield '%s'", f.Kind(), header)
+		}
+
+		if err := ii.setLineValue(inner, s, value, header); err != nil {
+			return err
+		}
+		setNullableValid(f)
+	}
+
+	return nil
+}
+
+// cleanNumberString removes the thousand separators and the trailing unit from
+// a number as it is written in a CSV file
+func cleanNumberString(s string) string {
+	s = strings.Replace(s, ".", "", -1) //remove possible dots
+	return strings.Trim(s, "%\n ")
+}
+
+// isTrueString reports whether s is one of the spellings of "true" the import
+// accepts. Everything else is false
+func isTrueString(s string) bool {
+	switch strings.ToLower(s) {
+	case "wahr", "true", "ja", "yes", "1", "x":
+		return true
+	}
+
+	return false
+}
+
 // GetExcelLineValues returns an instance of the array element.
 // It must be cast to the concrete type by the caller
-func (ii *Importer[C]) GetExcelLineValues(line int, row *xlsx.Row) *reflect.Value {
+func (ii *Importer[C]) GetExcelLineValues(line int, row *Row) *reflect.Value {
 	v := reflect.New(ii.structType).Elem()
 	var err error
 
@@ -314,7 +283,7 @@ func (ii *Importer[C]) GetExcelLineValues(line int, row *xlsx.Row) *reflect.Valu
 		if col < len(row.Cells) {
 			cell := row.Cells[col]
 
-			err = ii.getCellValue(cell, f, &v)
+			_, err = ii.getCellValue(cell, f, &v)
 			if err != nil {
 				ii.errorList.AddErrorString("error on getting field values for:%v error: %v", excelRef, err.Error())
 			}
@@ -326,7 +295,7 @@ func (ii *Importer[C]) GetExcelLineValues(line int, row *xlsx.Row) *reflect.Valu
 
 // GetExcelLineColValues returns an instance of the array element.
 // It must be cast to the concrete type by the caller
-func (ii *Importer[C]) GetExcelLineColValues(line int, row *xlsx.Row) *reflect.Value {
+func (ii *Importer[C]) GetExcelLineColValues(line int, row *Row) *reflect.Value {
 	v := reflect.New(ii.structType).Elem()
 	var err error
 
@@ -337,7 +306,7 @@ func (ii *Importer[C]) GetExcelLineColValues(line int, row *xlsx.Row) *reflect.V
 		if col < len(row.Cells) {
 			cell := row.Cells[col]
 
-			err = ii.getCellValue(cell, f, &v)
+			_, err = ii.getCellValue(cell, f, &v)
 			if err != nil {
 				ii.errorList.AddErrorString("error on getting field values for:%v error: %v", excelRef, err.Error())
 			}
@@ -349,19 +318,19 @@ func (ii *Importer[C]) GetExcelLineColValues(line int, row *xlsx.Row) *reflect.V
 
 // GetExcelPosValues returns an instance of the array element.
 // It must be cast to the concrete type by the caller
-func (ii *Importer[C]) GetExcelPosValues(sh *xlsx.Sheet) *reflect.Value {
+func (ii *Importer[C]) GetExcelPosValues(sh *Sheet) *reflect.Value {
 	v := reflect.New(ii.structType).Elem()
 
 	for excelRef, value := range ii.fields {
 		f := v.FieldByName(value.Field.Name)
-		colNr, rowNr, err := xlsx.GetCoordsFromCellIDString(value.ExcelPos)
+		colNr, rowNr, err := cellRefToPos(value.ExcelPos)
 		if err != nil {
 			ii.errorList.AddErrorString("error on getting excel cooridante for: %s error: %v", value.ExcelPos, err.Error())
 		}
 
 		cell := sh.Cell(rowNr, colNr)
 
-		err = ii.getCellValue(cell, f, &v)
+		_, err = ii.getCellValue(cell, f, &v)
 		if err != nil {
 			ii.errorList.AddErrorString("error on getting field values for:%v error: %v", excelRef, err.Error())
 		}
@@ -404,106 +373,68 @@ func (ii *Importer[C]) fieldForName(fieldName string) *field {
 	return nil
 }
 
-func (ii *Importer[C]) getCellValue(cell *xlsx.Cell, f reflect.Value, v *reflect.Value) error {
-	//v := reflect.New(ii.structType).Elem()
+// getCellValue converts the value of an Excel cell into the struct field it
+// belongs to. The bool reports whether a value was assigned, which is what
+// tells a nullable field apart from one that stays unset
+func (ii *Importer[C]) getCellValue(cell *Cell, f reflect.Value, v *reflect.Value) (bool, error) {
 	kk := f.Kind().String()
-	if cell.Value != "" && !slices.Contains(ii.Config.EmptyValueStrings, cell.Value) {
-		fieldVal := f.Interface()
-		switch fieldVal.(type) {
-		case int, int32, int64:
-			i, err := cell.Int()
-			if err != nil {
-				return fmt.Errorf("getting reflect on field: %s int: %w", kk, err)
-			}
-			f.SetInt(int64(i))
-		case uint, uint32, uint64:
-			i, err := cell.Int()
-			if err != nil {
-				return fmt.Errorf("getting reflect on field: %s int: %w", kk, err)
-			}
-			f.SetUint(uint64(i))
-		case string:
-			f.SetString(cell.String())
-		case time.Time:
-			t := cell.Type()
-			if t == xlsx.CellTypeNumeric {
-				t, err := cell.GetTime(false)
-				if err != nil {
-					return fmt.Errorf("getting reflect on field: %s time.Time: %w", kk, err)
-				}
-				f.Set(reflect.ValueOf(t))
-			}
-		case float32, float64:
-			i, err := cell.Float()
-			if err != nil {
-				return fmt.Errorf("getting reflect on field: %s float: %w", kk, err)
-			}
 
-			f.SetFloat(i)
-		case bool:
-			s := strings.ToLower(cell.String())
-			if s == "wahr" || s == "true" || s == "ja" || s == "yes" || s == "1" || s == "x" {
-				f.SetBool(true)
-			} else {
-				f.SetBool(false)
-			}
-		case null.String:
-			f.Set(reflect.ValueOf(null.StringFrom(cell.String())))
-		case null.Time:
-			if cell.Type() == xlsx.CellTypeNumeric {
-				t, err := cell.GetTime(false)
-				if err != nil {
-					return fmt.Errorf("getting reflect on field: %s null.Time: %w", kk, err)
-				}
-				f.Set(reflect.ValueOf(null.TimeFrom(t)))
-			}
-		case null.Float32:
-			i, err := cell.Float()
-			if err != nil {
-				return fmt.Errorf("getting reflect on field: %s nullFloat32: %w", kk, err)
-			}
-			f.Set(reflect.ValueOf(null.Float32From(float32(i))))
-		case null.Float64:
-			i, err := cell.Float()
-			if err != nil {
-				return fmt.Errorf("getting reflect on field: %s nullFloat64: %w", kk, err)
-			}
-			f.Set(reflect.ValueOf(null.Float64From(i)))
-		case null.Int:
-			i, err := cell.Int()
-			if err != nil {
-				return fmt.Errorf("getting reflect on field: %s null.Int: %w", kk, err)
-			}
-			f.Set(reflect.ValueOf(null.IntFrom(i)))
-		case null.Int64:
-			i, err := cell.Int64()
-			if err != nil {
-				return fmt.Errorf("getting reflect on field: %s null.Int64: %w", kk, err)
-			}
-			f.Set(reflect.ValueOf(null.Int64From(i)))
-		case null.Int32:
-			i, err := cell.Int()
-			if err != nil {
-				return fmt.Errorf("getting reflect on field: %s null.Int32: %w", kk, err)
-			}
-			f.Set(reflect.ValueOf(null.Int32From(int32(i))))
-		case null.Uint:
-			i, err := cell.Int()
-			if err != nil {
-				return fmt.Errorf("getting reflect on field: %s null.UInt: %w", kk, err)
-			}
-			f.Set(reflect.ValueOf(null.UintFrom(uint(i))))
-		case null.Bool:
-			s := strings.ToLower(cell.String())
-			if s == "wahr" || s == "true" || s == "ja" || s == "yes" || s == "1" || s == "x" {
-				f.Set(reflect.ValueOf(null.BoolFrom(true)))
-			} else {
-				f.Set(reflect.ValueOf(null.BoolFrom(false)))
-			}
-		default:
-			return fmt.Errorf("undefined kind '%v'", f.Kind())
-		}
+	if cell.Value == "" || slices.Contains(ii.Config.EmptyValueStrings, cell.Value) {
+		return false, nil
 	}
 
-	return nil
+	switch f.Interface().(type) {
+	case int, int32, int64:
+		i, err := cell.Int()
+		if err != nil {
+			return false, fmt.Errorf("getting reflect on field: %s int: %w", kk, err)
+		}
+		f.SetInt(int64(i))
+
+	case uint, uint32, uint64:
+		i, err := cell.Int()
+		if err != nil {
+			return false, fmt.Errorf("getting reflect on field: %s int: %w", kk, err)
+		}
+		f.SetUint(uint64(i))
+
+	case string:
+		f.SetString(cell.String())
+
+	case time.Time:
+		//a date is a number in Excel, anything else is left alone
+		if cell.Type() != CellTypeNumeric {
+			return false, nil
+		}
+
+		t, err := cell.GetTime()
+		if err != nil {
+			return false, fmt.Errorf("getting reflect on field: %s time.Time: %w", kk, err)
+		}
+		f.Set(reflect.ValueOf(t))
+
+	case float32, float64:
+		i, err := cell.Float()
+		if err != nil {
+			return false, fmt.Errorf("getting reflect on field: %s float: %w", kk, err)
+		}
+		f.SetFloat(i)
+
+	case bool:
+		f.SetBool(isTrueString(cell.String()))
+
+	default:
+		inner, ok := nullableValue(f)
+		if !ok {
+			return false, fmt.Errorf("undefined kind '%v'", f.Kind())
+		}
+
+		set, err := ii.getCellValue(cell, inner, v)
+		if err != nil || !set {
+			return false, err
+		}
+		setNullableValid(f)
+	}
+
+	return true, nil
 }

@@ -26,6 +26,7 @@ func NewExcelPageImporter[C any](config *ExcelPageConfig, eL *ErrorList) (ExcelP
 		eL.AddErrorMsg(err, "reading sheet")
 		return r, nil
 	}
+	defer func() { _ = sh.Close() }()
 
 	mV := r.GetExcelPosValues(sh)
 	if eL.HasAny() {

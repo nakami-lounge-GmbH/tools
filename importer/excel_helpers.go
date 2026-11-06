@@ -1,12 +1,10 @@
 package importer
 
 import (
-	"github.com/tealeg/xlsx"
-	"golang.org/x/exp/slices"
 	"strings"
 )
 
-func headerToStrings(row *xlsx.Row) ([]string, int) {
+func headerToStrings(row *Row) ([]string, int) {
 	var ret []string
 	for _, c := range row.Cells {
 		ret = append(ret, c.String())
@@ -23,27 +21,14 @@ func isEmpty(line []string) bool {
 	return true
 }
 
-func rowToStrings(row *xlsx.Row, length int) []string {
-	var ret []string
+// rowToStrings returns the cells of the row as text, as Excel displays them,
+// padded to length. The result is used to tell empty rows apart from rows with
+// content, the typed values are read from the cells themselves
+func rowToStrings(row *Row, length int) []string {
+	ret := make([]string, 0, length)
 	for i := 0; i < length; i++ {
-		if len(row.Cells) > i {
-			c := row.Cells[i]
-			if c.Type() == xlsx.CellTypeNumeric && !slices.Contains([]string{"", "general", "@"}, c.NumFmt) {
-				form := c.NumFmt
-
-				t, err := c.GetTime(false)
-				if err == nil {
-					if strings.Contains(form, "h") || strings.Contains(form, "h") {
-						ret = append(ret, t.Format("02/01/2006 15:04:05"))
-					} else {
-						ret = append(ret, t.Format("02/01/2006"))
-					}
-				} else {
-					ret = append(ret, "")
-				}
-			} else {
-				ret = append(ret, c.String())
-			}
+		if i < len(row.Cells) {
+			ret = append(ret, row.Cells[i].String())
 		} else {
 			ret = append(ret, "")
 		}

@@ -38,6 +38,7 @@ func NewExcelLineColImporter[C any](config *ExcelLineColConfig, eL *ErrorList) (
 	if err != nil {
 		return r, fmt.Errorf("error reading sheet %w", err)
 	}
+	defer func() { _ = sh.Close() }()
 
 	headerCount := 0
 	var line []string
